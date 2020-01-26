@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xmlns:wsc="http://www.mulesoft.org/schema/mule/wsc"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/wsc http://www.mulesoft.org/schema/mule/wsc/current/mule-wsc.xsd
+http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd">
+	<wsc:config name="Web_Service_Consumer_Config" doc:name="Web Service Consumer Config" doc:id="866a5226-c3a7-4964-8fa8-5304c8d01220" >
+		<wsc:connection wsdlLocation="http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso?WSDL" service="CountryInfoService" port="CountryInfoServiceSoap12" address="http://webservices.oorsprong.org/websamples.countryinfo/CountryInfoService.wso" />
+	</wsc:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="6a51dc58-8d52-4ae4-afe8-ebeacd853d07" >
+		<http:listener-connection host="0.0.0.0" port="8081" />
+	</http:listener-config>
+	<flow name="rs-assessment-4Flow" doc:id="7de96dc8-60ce-4258-81df-e53d11dce450" >
+		<http:listener doc:name="Listener" doc:id="0e6dbaee-3967-40f5-b02c-e347f3d91bcb" config-ref="HTTP_Listener_config" path="/test"/>
+		<wsc:consume operation="ListOfCountryNamesGroupedByContinent" doc:name="Consume" doc:id="ec9edcc2-c56c-4cc4-8540-fd469f799fbd" config-ref="Web_Service_Consumer_Config"/>
+		<ee:transform doc:name="Africa" doc:id="3b402fb4-ba01-4912-ab69-802b231b8dc1" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/xml
+var africa = payload.body.ListOfCountryNamesGroupedByContinentResponse.*ListOfCountryNamesGroupedByContinentResult.*tCountryCodeAndNameGroupedByContinent filter ((item, index) -> (item.Continent.sName=="Africa                             ") or (item.Continent.sName=="Asia                               ") or (item.Continent.sName=="Europe                             ") or (item.Continent.sName=="The Americas                       ")) 
+
+
+
+---
+"tCountryCodeAndNameGroupedByContinent" : {
+    "CountryCodeAndNames": africa..*"tCountryCodeAndName" filter($."sName"
+~= "Cameroon" or $."sName" ~= "Suriname" or $."sName" ~= "Germany" or $."sName" ~= "Hungary" or $."sName" ~= "Belarus" or $."sName" ~= "India" or $."sName" ~= "Mongolia" or $."sName" ~= "Belarus")
+}]]></ee:set-payload>
+			</ee:message>
+			<ee:variables >
+			</ee:variables>
+		</ee:transform>
+	</flow>
+	<flow name="rs-assessment-4Flow1" doc:id="8552850d-e191-4e35-8de2-846628270355" >
+		<http:listener doc:name="Listener" doc:id="cd98c1c0-57d1-476c-9ff2-5f7030a62737" config-ref="HTTP_Listener_config" path="/test2"/>
+		<wsc:consume operation="FullCountryInfoAllCountries" doc:name="Consume" doc:id="f7b5e994-e940-474d-8558-d060b233e656" config-ref="Web_Service_Consumer_Config">
+		</wsc:consume>
+		<ee:transform doc:name="Transform Message" doc:id="f328c930-47ea-40f4-89a0-14762bae8cf4">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+var info = payload.body.FullCountryInfoAllCountriesResponse.FullCountryInfoAllCountriesResult.*tCountryInfo
+
+var lang = 
+info filter ($.Languages.tLanguage.sName == "French")
+
+var countriesfr = lang.sName
+---
+
+countriesfr map ((item, index) -> {
+   info:   payload.body.FullCountryInfoAllCountriesResponse.FullCountryInfoAllCountriesResult.*tCountryInfo map ((item1, index1) -> {
+       data : if(item1.sName == item) payload.body.FullCountryInfoAllCountriesResponse.FullCountryInfoAllCountriesResult.tCountryInfo
+       else ''
+   }) 
+})]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	</flow>
+</mule>
